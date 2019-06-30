@@ -71,37 +71,37 @@ export default {
       resLines.push(turf.polygonToLine(item));
     });
     this.map.on("load", () => {
-      this.map.addLayer({
-        id: "poly",
-        type: "fill",
-        source: {
-          type: "geojson",
-          data: poly
-        },
-        layout: {},
-        paint: {
-          "fill-color": "#088",
-          "fill-opacity": 0.5
-        }
-      });
-      this.map.addLayer({
-        id: "line",
-        type: "line",
-        source: {
-          type: "geojson",
-          data: turf.polygonToLine(poly)
-        },
-        layout: {
-          "line-join": "round",
-          "line-cap": "round"
-        },
-        paint: {
-          "line-color": "#fff",
-          "line-width": 4
-        }
-      });
+      // this.map.addLayer({
+      //   id: "poly",
+      //   type: "fill",
+      //   source: {
+      //     type: "geojson",
+      //     data: poly
+      //   },
+      //   layout: {},
+      //   paint: {
+      //     "fill-color": "#088",
+      //     "fill-opacity": 0.5
+      //   }
+      // });
+      // this.map.addLayer({
+      //   id: "line",
+      //   type: "line",
+      //   source: {
+      //     type: "geojson",
+      //     data: turf.polygonToLine(poly)
+      //   },
+      //   layout: {
+      //     "line-join": "round",
+      //     "line-cap": "round"
+      //   },
+      //   paint: {
+      //     "line-color": "#fff",
+      //     "line-width": 4
+      //   }
+      // });
 
-      // 裁剪结果
+      // // 裁剪结果
       this.map.addLayer({
         id: "result",
         type: "fill",

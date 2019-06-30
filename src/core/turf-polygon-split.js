@@ -2,13 +2,13 @@
 import * as turf from '@turf/turf'
 
 console.log(turf)
-function splitPolygon(polygon, clipLine) {
-  let clipLineType = clipLine.geometry.type
-  switch (clipLineType) {
+function splitPolygon(polygon, splitter) {
+  let splitterType = splitter.geometry.type
+  switch (splitterType) {
     case 'LineString':
-      return splitPolygonWithLine(polygon, clipLine);
+      return splitPolygonWithLine(polygon, splitter);
     case 'Polygon':
-      return splitPolygonWithPolygon(polygon, clipLine);
+      return splitPolygonWithPolygon(polygon, splitter);
   }
 }
 
@@ -30,15 +30,15 @@ function unionPolygon(polygons) {
  * 面类型只能是polygon 但可以是环
  * 注:线与多边形必须有两个交点
  */
-function splitPolygonWithLine(polygon, clipLine) {
+function splitPolygonWithLine(polygon, splitter) {
   let p1 = null
   let p2 = null
 
   // 判断线与面的交点个数
-  let intersects = turf.lineIntersect(turf.polygonToLine(polygon), clipLine)
+  let intersects = turf.lineIntersect(turf.polygonToLine(polygon), splitter)
   if (!intersects || intersects.features.length < 2) { return }
 
-  let bufferPolygon = turf.buffer(clipLine, 0.0001, { units: 'meters' })
+  let bufferPolygon = turf.buffer(splitter, 0.0001, { units: 'meters' })
   let poly = turf.difference(polygon, bufferPolygon)
 
   if (poly.geometry.coordinates.length < 2) {
@@ -47,9 +47,9 @@ function splitPolygonWithLine(polygon, clipLine) {
     let poly1 = turf.polygon(poly.geometry.coordinates[0])
     let poly2 = turf.polygon(poly.geometry.coordinates[1])
 
-    let res = combinePolygons([poly1, poly2], clipLine)
-    p1 = res.leftPolygons[0]
-    p2 = res.rightPolygons[0]
+    let res = combinePolygons([poly1, poly2], splitter)
+    p1 = res.p1[0]
+    p2 = res.p2[0]
 
   } else if (poly.geometry.coordinates.length > 2) {
     let polygons = []
@@ -57,9 +57,9 @@ function splitPolygonWithLine(polygon, clipLine) {
       polygons.push(turf.polygon(item))
     })
 
-    let res = combinePolygons(polygons, clipLine)
-    p1 = polygons2MultiPolygon(res.leftPolygons)
-    p2 = polygons2MultiPolygon(res.rightPolygons)
+    let res = combinePolygons(polygons, splitter)
+    p1 = polygons2MultiPolygon(res.p1)
+    p2 = polygons2MultiPolygon(res.p2)
   }
   return [p1, p2]
 }
@@ -72,68 +72,63 @@ function splitPolygonWithPolygon(polygon, splitter) {
   }
 }
 
-function combinePolygons(polygons, clipLine) {
+function combinePolygons(polygons, splitter) {
   if (polygons.length === 0) { return }
-  let leftPolygons = []
-  let rightPolygons = []
+  let p1 = []
+  let p2 = []
 
   polygons.map(item => {
-    let leftOffsetLine = turf.lineOffset(clipLine, -0.0001, { units: 'meters' })
-    let rightOffsetLine = turf.lineOffset(clipLine, 0.0001, { units: 'meters' })
+    let leftOffsetLine = turf.lineOffset(splitter, -0.0001, { units: 'meters' })
+    let rightOffsetLine = turf.lineOffset(splitter, 0.0001, { units: 'meters' })
 
     let isLeftDisjoint = turf.booleanDisjoint(leftOffsetLine, item)
     let isRightDisjoint = turf.booleanDisjoint(rightOffsetLine, item)
 
     if (!isLeftDisjoint) {
-      rightPolygons.push(item)
+      p2.push(item)
     } else if (!isRightDisjoint) {
-      leftPolygons.push(item)
+      p1.push(item)
     } else {
       let center = turf.center(item)
       let dis1 = turf.pointToLineDistance(center, leftOffsetLine)
       let dis2 = turf.pointToLineDistance(center, rightOffsetLine)
       if (dis1 > dis2) {
-        leftPolygons.push(item)
+        p1.push(item)
       } else {
-        rightPolygons.push(item)
+        p2.push(item)
       }
     }
   })
 
-  return {
-    leftPolygons: leftPolygons,
-    rightPolygons: rightPolygons
-  }
+  return { p1: p1, p2: p2 }
 }
 
 
-function splitSinglePolygon(polygon, clipPolygon) {
+function splitSinglePolygon(polygon, splitter) {
   // 选中多边形和绘制多边形之间的公共部分
-  let intersection = intersect(polygon, clipPolygon)
+  let intersection = turf.intersect(polygon, splitter)
   if (!intersection) { return }
-  intersection.properties = polygon.properties
 
   // 选中多边形和绘制多边形中不一样的部分
-  let difference = difference(polygon, clipPolygon)
+  let difference = turf.difference(polygon, splitter)
   if (!difference) { return }
 
   return [difference, intersection]
 }
 
-function splitMultiPolygon(polygon, clipPolygon) {
+function splitMultiPolygon(polygon, splitter) {
   let polygons = multiPolygon2polygons(polygon)
   let intersectArr = []
   polygons.forEach(function (poly) {
-    let intersection = intersect(poly, clipPolygon)
+    let intersection = turf.intersect(poly, splitter)
     if (intersection) {
       intersectArr.push(intersection)
     }
   })
 
   // 选中多边形和绘制多边形中不一样的部分
-  let difference = difference(polygon, clipPolygon)
-  difference.properties = polygon.properties
-  let uPolygon = unionPolygon(intersectArr)
+  let difference = turf.difference(polygon, splitter)
+  let uPolygon = turf.unionPolygon(intersectArr)
 
   if (!difference || !uPolygon) { return }
   return [difference, uPolygon]
